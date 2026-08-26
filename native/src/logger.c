@@ -163,4 +163,3 @@ void log_scheduler_snapshot(SharedMemorySegment *shm, const char *action_title) 
     }
     logger_log(LOG_LEVEL_INFO, "===============================");
 }
-
