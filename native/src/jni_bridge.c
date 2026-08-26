@@ -360,7 +360,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getTaskCount(JNIEnv *env, jo
     return count;
 }
 
-
+/*
+ * Java:
+ *
+ * NativeScheduler.getTaskState(int taskId)
+ *
+ * Возвращает текущее состояние задачи по ее пользовательскому ID.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getTaskState(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -375,11 +381,25 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getTaskState(JNIEnv *env, jo
             return state;
         }
     }
+
+    /*
+     * Если задача с таким ID не была найдена.
+     */
     pthread_mutex_unlock(&current_shm->mutex);
     return -1;
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getRemainingTime(int taskId)
+ *
+ * Возвращает оставшееся время выполнения задачи
+ * в миллисекундах.
+ *
+ * Worker уменьшает remaining_time_ms после каждого quantum.
+ */
 JNIEXPORT jlong JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getRemainingTime(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -399,6 +419,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getRemainingTime(JNIEnv *env
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getBasePriority(int taskId)
+ *
+ * Возвращает базовый приоритет задачи.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getBasePriority(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -418,6 +445,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getBasePriority(JNIEnv *env,
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getEffectivePriority(int taskId)
+ *
+ * Возвращает текущий эффективный приоритет задачи.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getEffectivePriority(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -437,6 +471,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getEffectivePriority(JNIEnv 
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getHeldResources(int taskId)
+ *
+ * Возвращает битовую маску ресурсов, которыми задача владеет в текущий момент.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getHeldResources(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -456,6 +497,15 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getHeldResources(JNIEnv *env
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getRunningTaskId()
+ *
+ * Возвращает ID задачи, которую Scheduler в данный момент назначил Worker.
+ *
+ * running_task_id хранится непосредственно в SharedMemorySegment.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getRunningTaskId(JNIEnv *env, jobject thiz) {
     if (current_shm == NULL) {
@@ -469,6 +519,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getRunningTaskId(JNIEnv *env
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getReadyQueueSize()
+ *
+ * Возвращает количество задач, которые сейчас находятся в ready_queue.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getReadyQueueSize(JNIEnv *env, jobject thiz) {
     if (current_shm == NULL) {
@@ -482,6 +539,13 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getReadyQueueSize(JNIEnv *en
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getBlockedQueueSize()
+ *
+ * Возвращает количество задач, которые сейчас находятся в blocked_queue.
+ */
 JNIEXPORT jint JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getBlockedQueueSize(JNIEnv *env, jobject thiz) {
     if (current_shm == NULL) {
@@ -495,6 +559,14 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getBlockedQueueSize(JNIEnv *
 }
 
 
+/*
+ * Java:
+ *
+ * NativeScheduler.getWaitTicks(int taskId)
+ *
+ * Возвращает текущее количество циклов ожидания, накопленных задачей для механизма aging.
+ *
+ */
 JNIEXPORT jlong JNICALL
 Java_com_taskscheduler_nativebridge_NativeScheduler_getWaitTicks(JNIEnv *env, jobject thiz, jint taskId) {
     if (current_shm == NULL) {
@@ -512,4 +584,3 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getWaitTicks(JNIEnv *env, jo
     pthread_mutex_unlock(&current_shm->mutex);
     return -1;
 }
-
