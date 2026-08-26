@@ -1,0 +1,21 @@
+# Build outputs & target directories
+target/
+native/build/
+native/CMakeCache.txt
+native/CMakeFiles/
+
+# Compiled native libraries
+*.so
+*.dll
+*.dylib
+
+# IDE specific files
+.vscode/settings.json
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# OS files
+.DS_Store
+Thumbs.db
