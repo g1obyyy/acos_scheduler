@@ -21,4 +21,16 @@ public final class NativeScheduler {
     public native int submitTask(int id, int priority, long totalTimeMs, int requiredResources);
     public native void changePriority(int taskId, int priority);
     public native int getTaskCount();
+
+    // Read-only методы для тестирования состояния задач и очередей
+    public native int getTaskState(int taskId);
+    public native long getRemainingTime(int taskId);
+    public native int getBasePriority(int taskId);
+    public native int getEffectivePriority(int taskId);
+    public native int getHeldResources(int taskId);
+    public native int getRunningTaskId();
+    public native int getReadyQueueSize();
+    public native int getBlockedQueueSize();
+    public native long getWaitTicks(int taskId);
 }
+

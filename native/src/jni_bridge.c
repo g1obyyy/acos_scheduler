@@ -206,6 +206,22 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_submitTask(JNIEnv *env, jobj
 
     pthread_mutex_lock(&current_shm->mutex);
 
+    // Валидация входных данных (Negative Test support)
+    if (id < 0 || priority < 0 || totalTimeMs <= 0) {
+        logger_log(LOG_LEVEL_ERROR, "Validation failed: invalid task parameters (id=%d, priority=%d, time=%ld)", (int)id, (int)priority, (long)totalTimeMs);
+        pthread_mutex_unlock(&current_shm->mutex);
+        return -1;
+    }
+
+    // Проверка уникальности ID задачи
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == id) {
+            logger_log(LOG_LEVEL_ERROR, "Validation failed: task ID %d already exists", (int)id);
+    pthread_mutex_unlock(&current_shm->mutex);
+            return -1;
+        }
+    }
+
     /*
      * Проверяем, осталось ли место для новой задачи.
      */
@@ -343,3 +359,157 @@ Java_com_taskscheduler_nativebridge_NativeScheduler_getTaskCount(JNIEnv *env, jo
     pthread_mutex_unlock(&current_shm->mutex);
     return count;
 }
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getTaskState(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            int state = current_shm->tasks[i].state;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return state;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
+
+JNIEXPORT jlong JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getRemainingTime(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            long rem = current_shm->tasks[i].remaining_time_ms;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return rem;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getBasePriority(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            int bp = current_shm->tasks[i].base_priority;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return bp;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getEffectivePriority(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            int ep = current_shm->tasks[i].effective_priority;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return ep;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getHeldResources(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            int held = current_shm->tasks[i].held_resources;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return held;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getRunningTaskId(JNIEnv *env, jobject thiz) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    int rid = current_shm->running_task_id;
+    pthread_mutex_unlock(&current_shm->mutex);
+    return rid;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getReadyQueueSize(JNIEnv *env, jobject thiz) {
+    if (current_shm == NULL) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    int sz = current_shm->ready_queue.size;
+    pthread_mutex_unlock(&current_shm->mutex);
+    return sz;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getBlockedQueueSize(JNIEnv *env, jobject thiz) {
+    if (current_shm == NULL) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    int sz = current_shm->blocked_queue.size;
+    pthread_mutex_unlock(&current_shm->mutex);
+    return sz;
+}
+
+
+JNIEXPORT jlong JNICALL
+Java_com_taskscheduler_nativebridge_NativeScheduler_getWaitTicks(JNIEnv *env, jobject thiz, jint taskId) {
+    if (current_shm == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&current_shm->mutex);
+    for (int i = 0; i < current_shm->task_count; i++) {
+        if (current_shm->tasks[i].id == taskId) {
+            long wt = current_shm->tasks[i].wait_ticks;
+            pthread_mutex_unlock(&current_shm->mutex);
+            return wt;
+        }
+    }
+    pthread_mutex_unlock(&current_shm->mutex);
+    return -1;
+}
+
