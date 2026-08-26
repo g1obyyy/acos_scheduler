@@ -118,18 +118,18 @@ void apply_aging(SharedMemorySegment *shm) {
             int idx = shm->ready_queue.task_indices[(shm->ready_queue.head + i) % MAX_TASKS];
             Task *t = &shm->tasks[idx];
 
-        // Increment wait ticks for tasks waiting in ready queue
         t->wait_ticks++;
-        if (t->wait_ticks >= 5) { // Threshold for aging boost
+        if (t->wait_ticks >= 5) {
             t->priority++;
             t->wait_ticks = 0;
             aged = 1;
-            printf("[AGING] Task #%d waited too long, boosting priority to %d\n", t->id, t->priority);
+            logger_log(LOG_LEVEL_WARN, "Task #%d waited too long, boosting priority to %d", t->id, t->priority);
         }
     }
 
     if (aged) {
         queue_reorder_priority(shm, &shm->ready_queue);
+        logger_log(LOG_LEVEL_INFO, "Ready queue reordered due to aging");
     }
 }
 

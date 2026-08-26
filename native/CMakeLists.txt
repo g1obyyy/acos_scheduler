@@ -16,6 +16,7 @@ set(SOURCES
     src/scheduler_core.c
     src/scheduler_loop.c
     src/deadlock_detector.c
+    src/logger.c
 )
 
 add_library(taskscheduler SHARED ${SOURCES})

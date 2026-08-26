@@ -3,12 +3,14 @@
 #include "ipc_sync.h"
 #include "process_mgmt.h"
 #include "scheduler_core.h"
+#include "logger.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <semaphore.h>
 
 static SharedMemorySegment *current_shm = NULL;
+static char current_shm_name[256] = "/task_scheduler_shm";
 static pid_t scheduler_pid = -1;
 static pid_t worker_pid = -1;
 
@@ -17,11 +19,20 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_initi
     const char *name = (*env)->GetStringUTFChars(env, shmName, NULL);
     if (name == NULL) return;
 
-    current_shm = create_or_open_shm(name, 1);
+    strncpy(current_shm_name, name, sizeof(current_shm_name) - 1);
+    current_shm_name[sizeof(current_shm_name) - 1] = '\0';
+
+    logger_init(current_shm_name, "JNI");
+    logger_log(LOG_LEVEL_INFO, "Initializing scheduler with SHM: %s", current_shm_name);
+
+    current_shm = create_or_open_shm(current_shm_name, 1);
     if (current_shm != NULL) {
         init_shm_content(current_shm);
         queue_init(&current_shm->ready_queue);
         queue_init(&current_shm->blocked_queue);
+        logger_log(LOG_LEVEL_INFO, "Shared memory initialized successfully: %s", current_shm_name);
+    } else {
+        logger_log(LOG_LEVEL_ERROR, "Failed to create/open shared memory: %s", current_shm_name);
     }
 
     (*env)->ReleaseStringUTFChars(env, shmName, name);
@@ -31,13 +42,16 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_start
   (JNIEnv *env, jobject thiz) {
     if (current_shm == NULL) return;
     
+    logger_log(LOG_LEVEL_INFO, "Starting scheduler and worker processes for SHM: %s", current_shm_name);
     current_shm->shutdown_flag = 0;
-    scheduler_pid = spawn_scheduler_process(SHM_NAME);
-    worker_pid = spawn_worker_process(SHM_NAME);
+    scheduler_pid = spawn_scheduler_process(current_shm_name);
+    worker_pid = spawn_worker_process(current_shm_name);
+    logger_log(LOG_LEVEL_INFO, "Processes spawned: scheduler_pid=%d, worker_pid=%d", (int)scheduler_pid, (int)worker_pid);
 }
 
 JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_stop
   (JNIEnv *env, jobject thiz) {
+    logger_log(LOG_LEVEL_INFO, "Stopping scheduler and worker processes");
     if (current_shm != NULL) {
         current_shm->shutdown_flag = 1;
         sem_post(&current_shm->worker_sem);
@@ -56,9 +70,11 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_stop
     }
 
     if (current_shm != NULL) {
-        close_and_unlink_shm(SHM_NAME, current_shm, 1);
+        close_and_unlink_shm(current_shm_name, current_shm, 1);
         current_shm = NULL;
     }
+    logger_log(LOG_LEVEL_INFO, "Scheduler stopped and cleaned up");
+    logger_close();
 }
 
 JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submitTask
@@ -67,6 +83,7 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
 
     pthread_mutex_lock(&current_shm->mutex);
     if (current_shm->task_count >= MAX_TASKS) {
+        logger_log(LOG_LEVEL_ERROR, "Task submission failed: task count reached MAX_TASKS (%d)", MAX_TASKS);
         pthread_mutex_unlock(&current_shm->mutex);
         return -1;
     }
@@ -80,6 +97,7 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
     current_shm->tasks[idx].required_resources = requiredResources;
     current_shm->tasks[idx].held_resources = 0;
     current_shm->tasks[idx].assigned_worker_pid = -1;
+    current_shm->tasks[idx].wait_ticks = 0;
 
     current_shm->task_count++;
 
@@ -92,8 +110,8 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
         queue_push_tail(&current_shm->blocked_queue, idx);
     }
 
-    printf("[SUBMIT] Task #%d priority=%d required_resources=0x%X\n", id, priority, requiredResources);
-    print_queues(current_shm);
+    logger_log(LOG_LEVEL_INFO, "Submitted Task #%d priority=%d required_resources=0x%X", id, priority, requiredResources);
+    log_queues(current_shm);
 
     pthread_mutex_unlock(&current_shm->mutex);
 
@@ -112,8 +130,8 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_chang
             if (queue_contains(&current_shm->ready_queue, i)) {
                 queue_reorder_priority(current_shm, &current_shm->ready_queue);
             }
-            printf("[PRIORITY CHANGE] Task #%d new_priority=%d\n", taskId, priority);
-            print_queues(current_shm);
+            logger_log(LOG_LEVEL_INFO, "Changed priority for Task #%d to %d", taskId, priority);
+            log_queues(current_shm);
             break;
         }
     }

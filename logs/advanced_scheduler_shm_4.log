@@ -1,0 +1,10 @@
+[2026-08-26 16:29:57.684][PID=118079][JNI][INFO] Initializing scheduler with SHM: /advanced_scheduler_shm_4
+[2026-08-26 16:29:57.685][PID=118079][JNI][INFO] Shared memory initialized successfully: /advanced_scheduler_shm_4
+[2026-08-26 16:29:57.685][PID=118079][JNI][INFO] Starting scheduler and worker processes for SHM: /advanced_scheduler_shm_4
+[2026-08-26 16:29:57.689][PID=118079][JNI][INFO] Processes spawned: scheduler_pid=118131, worker_pid=118132
+[2026-08-26 16:29:57.689][PID=118079][JNI][INFO] Submitted Task #401 priority=5 required_resources=0x3
+[2026-08-26 16:29:57.689][PID=118079][JNI][DEBUG] READY: (empty) | BLOCKED: #401(waiting=0x3)
+[2026-08-26 16:29:57.689][PID=118079][JNI][INFO] Submitted Task #402 priority=10 required_resources=0x2
+[2026-08-26 16:29:57.689][PID=118079][JNI][DEBUG] READY: (empty) | BLOCKED: #401(waiting=0x3) -> #402(waiting=0x2)
+[2026-08-26 16:29:58.192][PID=118079][JNI][INFO] Stopping scheduler and worker processes
+[2026-08-26 16:29:58.199][PID=118079][JNI][INFO] Scheduler stopped and cleaned up

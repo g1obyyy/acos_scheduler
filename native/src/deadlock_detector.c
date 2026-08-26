@@ -1,5 +1,6 @@
 #include "scheduler_shm.h"
 #include "scheduler_core.h"
+#include "logger.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -106,8 +107,8 @@ int detect_and_resolve_deadlocks(SharedMemorySegment *shm) {
                 shm->running_task_id = -1;
             }
             resolved_count++;
-            printf("[DEADLOCK DETECTED] Aborted Task #%d due to circular wait deadlock.\n", victim->id);
-            print_queues(shm);
+            logger_log(LOG_LEVEL_WARN, "Deadlock detected. Victim Task #%d aborted", victim->id);
+            log_queues(shm);
 
             memset(state_arr, 0, sizeof(state_arr));
             cycle_len = 0;

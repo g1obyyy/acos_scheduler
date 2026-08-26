@@ -2,6 +2,7 @@
 #define SCHEDULER_CORE_H
 
 #include "scheduler_shm.h"
+#include "logger.h"
 
 void queue_init(TaskQueue *q);
 int queue_is_empty(const TaskQueue *q);
@@ -13,6 +14,6 @@ int queue_contains(const TaskQueue *q, int task_idx);
 void queue_reorder_priority(SharedMemorySegment *shm, TaskQueue *q);
 void apply_aging(SharedMemorySegment *shm);
 
-void print_queues(SharedMemorySegment *shm);
+void log_queues(SharedMemorySegment *shm);
 
 #endif
