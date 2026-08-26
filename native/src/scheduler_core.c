@@ -81,21 +81,20 @@ int queue_remove(TaskQueue *q, int task_idx) {
 void queue_reorder_priority(SharedMemorySegment *shm, TaskQueue *q) {
     if (q->size <= 1) return;
 
-    // Extract all elements into a temporary array
     int elems[MAX_TASKS];
     int count = q->size;
     for (int i = 0; i < count; i++) {
         elems[i] = queue_pop_head(q);
     }
 
-    // Bubble sort or insertion sort stably by priority DESC, then original order (stable)
+    // Стабильная сортировка вставками или пузырьком (DESC по effective_priority)
+    // При равном effective_priority сохраняется исходный FIFO-порядок
     for (int i = 0; i < count - 1; i++) {
         for (int j = 0; j < count - i - 1; j++) {
             Task *t1 = &shm->tasks[elems[j]];
             Task *t2 = &shm->tasks[elems[j + 1]];
 
-            // Higher priority first. If equal priority, preserve original relative order (stable sort)
-            if (t1->priority < t2->priority) {
+            if (t1->effective_priority < t2->effective_priority) {
                 int tmp = elems[j];
                 elems[j] = elems[j + 1];
                 elems[j + 1] = tmp;
@@ -103,7 +102,6 @@ void queue_reorder_priority(SharedMemorySegment *shm, TaskQueue *q) {
         }
     }
 
-    // Push back into queue
     for (int i = 0; i < count; i++) {
         queue_push_tail(q, elems[i]);
     }
@@ -120,31 +118,33 @@ void apply_aging(SharedMemorySegment *shm) {
 
         t->wait_ticks++;
         if (t->wait_ticks >= 5) {
-            t->priority++;
+            int old_eff = t->effective_priority;
+            t->effective_priority++;
             t->wait_ticks = 0;
             aged = 1;
-            logger_log(LOG_LEVEL_WARN, "Task #%d waited too long, boosting priority to %d", t->id, t->priority);
+            logger_log(LOG_LEVEL_WARN, "[AGING] Task #%d: effective_priority %d -> %d", t->id, old_eff, t->effective_priority);
         }
     }
 
     if (aged) {
         queue_reorder_priority(shm, &shm->ready_queue);
         logger_log(LOG_LEVEL_INFO, "Ready queue reordered due to aging");
+        log_scheduler_snapshot(shm, "AGING APPLIED");
     }
 }
 
 void print_queues(SharedMemorySegment *shm) {
-    printf("[READY QUEUE] ");
+    printf("READY: ");
     if (shm->ready_queue.size == 0) {
         printf("(empty)");
     } else {
         for (int i = 0; i < shm->ready_queue.size; i++) {
             int idx = shm->ready_queue.task_indices[(shm->ready_queue.head + i) % MAX_TASKS];
             Task *t = &shm->tasks[idx];
-            printf("#%d(p=%d)%s", t->id, t->priority, (i < shm->ready_queue.size - 1) ? " -> " : "");
+            printf("#%d(base=%d,eff=%d)%s", t->id, t->base_priority, t->effective_priority, (i < shm->ready_queue.size - 1) ? " -> " : "");
         }
     }
-    printf(" | [BLOCKED QUEUE] ");
+    printf(" | BLOCKED: ");
     if (shm->blocked_queue.size == 0) {
         printf("(empty)\n");
     } else {

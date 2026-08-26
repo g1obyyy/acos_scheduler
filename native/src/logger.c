@@ -96,7 +96,9 @@ void log_queues(SharedMemorySegment *shm) {
         for (int i = 0; i < shm->ready_queue.size; i++) {
             int idx = shm->ready_queue.task_indices[(shm->ready_queue.head + i) % MAX_TASKS];
             Task *t = &shm->tasks[idx];
-            offset += snprintf(rq_buf + offset, sizeof(rq_buf) - offset, "#%d(p=%d)%s", t->id, t->priority, (i < shm->ready_queue.size - 1) ? " -> " : "");
+            offset += snprintf(rq_buf + offset, sizeof(rq_buf) - offset, "#%d(base=%d,eff=%d,wait=%ld)%s",
+                               t->id, t->base_priority, t->effective_priority, t->wait_ticks,
+                               (i < shm->ready_queue.size - 1) ? " -> " : "");
         }
     }
 
@@ -107,9 +109,58 @@ void log_queues(SharedMemorySegment *shm) {
         for (int i = 0; i < shm->blocked_queue.size; i++) {
             int idx = shm->blocked_queue.task_indices[(shm->blocked_queue.head + i) % MAX_TASKS];
             Task *t = &shm->tasks[idx];
-            offset += snprintf(rq_buf + offset, sizeof(rq_buf) - offset, "#%d(waiting=0x%X)%s", t->id, t->required_resources & ~t->held_resources, (i < shm->blocked_queue.size - 1) ? " -> " : "");
+            offset += snprintf(rq_buf + offset, sizeof(rq_buf) - offset, "#%d(waiting=0x%X,held=0x%X)%s",
+                               t->id, t->required_resources & ~t->held_resources, t->held_resources,
+                               (i < shm->blocked_queue.size - 1) ? " -> " : "");
         }
     }
 
     logger_log(LOG_LEVEL_DEBUG, "%s", rq_buf);
 }
+
+void log_scheduler_snapshot(SharedMemorySegment *shm, const char *action_title) {
+    logger_log(LOG_LEVEL_INFO, "=== SNAPSHOT: %s ===", action_title ? action_title : "UPDATE");
+
+    // Find running task
+    Task *running_t = NULL;
+    for (int i = 0; i < shm->task_count; i++) {
+        if (shm->tasks[i].id == shm->running_task_id) {
+            running_t = &shm->tasks[i];
+            break;
+        }
+    }
+
+    if (running_t) {
+        logger_log(LOG_LEVEL_INFO, "  RUNNING: #%d base=%d effective=%d remaining=%ldms",
+                   running_t->id, running_t->base_priority, running_t->effective_priority, running_t->remaining_time_ms);
+    } else {
+        logger_log(LOG_LEVEL_INFO, "  RUNNING: (none)");
+    }
+
+    logger_log(LOG_LEVEL_INFO, "  READY QUEUE:");
+    if (shm->ready_queue.size == 0) {
+        logger_log(LOG_LEVEL_INFO, "    (empty)");
+    } else {
+        for (int i = 0; i < shm->ready_queue.size; i++) {
+            int idx = shm->ready_queue.task_indices[(shm->ready_queue.head + i) % MAX_TASKS];
+            Task *t = &shm->tasks[idx];
+            logger_log(LOG_LEVEL_INFO, "    %d. #%d base=%d effective=%d wait=%ld remaining=%ldms",
+                       i + 1, t->id, t->base_priority, t->effective_priority, t->wait_ticks, t->remaining_time_ms);
+        }
+    }
+
+    logger_log(LOG_LEVEL_INFO, "  BLOCKED QUEUE:");
+    if (shm->blocked_queue.size == 0) {
+        logger_log(LOG_LEVEL_INFO, "    (empty)");
+    } else {
+        for (int i = 0; i < shm->blocked_queue.size; i++) {
+            int idx = shm->blocked_queue.task_indices[(shm->blocked_queue.head + i) % MAX_TASKS];
+            Task *t = &shm->tasks[idx];
+            logger_log(LOG_LEVEL_INFO, "    %d. #%d base=%d effective=%d waiting=0x%X held=0x%X",
+                       i + 1, t->id, t->base_priority, t->effective_priority,
+                       t->required_resources & ~t->held_resources, t->held_resources);
+        }
+    }
+    logger_log(LOG_LEVEL_INFO, "===============================");
+}
+

@@ -7,9 +7,9 @@
 #define MAX_TASKS 256
 #define SHM_NAME "/task_scheduler_shm"
 
+// Оставляем только Priority Scheduling
 typedef enum {
-    SCHEDULER_ALGORITHM_PRIORITY = 0,
-    SCHEDULER_ALGORITHM_ROUND_ROBIN = 1
+    SCHEDULER_ALGORITHM_PRIORITY = 0
 } SchedulerAlgorithm;
 
 typedef enum {
@@ -23,14 +23,15 @@ typedef enum {
 
 typedef struct {
     int id;
-    int priority;
+    int base_priority;          // Исходный приоритет, заданный пользователем
+    int effective_priority;     // Текущий приоритет с учетом aging (по нему сортируется ready_queue)
     int state;
     long total_time_ms;
     long remaining_time_ms;
     unsigned int required_resources;
     unsigned int held_resources;
     int assigned_worker_pid;
-    long wait_ticks;
+    long wait_ticks;            // Счетчик ожидания для aging
 } Task;
 
 typedef struct {

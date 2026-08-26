@@ -90,7 +90,8 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
 
     int idx = current_shm->task_count;
     current_shm->tasks[idx].id = id;
-    current_shm->tasks[idx].priority = priority;
+    current_shm->tasks[idx].base_priority = priority;
+    current_shm->tasks[idx].effective_priority = priority;
     current_shm->tasks[idx].state = (requiredResources == 0) ? TASK_STATE_READY : TASK_STATE_NEW;
     current_shm->tasks[idx].total_time_ms = totalTimeMs;
     current_shm->tasks[idx].remaining_time_ms = totalTimeMs;
@@ -103,16 +104,13 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
 
     if (requiredResources == 0) {
         queue_push_tail(&current_shm->ready_queue, idx);
-        if (current_shm->active_algorithm == SCHEDULER_ALGORITHM_PRIORITY) {
             queue_reorder_priority(current_shm, &current_shm->ready_queue);
-        }
     } else {
         queue_push_tail(&current_shm->blocked_queue, idx);
     }
 
-    logger_log(LOG_LEVEL_INFO, "Submitted Task #%d priority=%d required_resources=0x%X", id, priority, requiredResources);
-    log_queues(current_shm);
-
+    logger_log(LOG_LEVEL_INFO, "Submitted Task #%d base_priority=%d required_resources=0x%X", id, priority, requiredResources);
+    log_scheduler_snapshot(current_shm, "TASK SUBMITTED");
     pthread_mutex_unlock(&current_shm->mutex);
 
     sem_post(&current_shm->scheduler_event_sem);
@@ -126,12 +124,19 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_chang
     pthread_mutex_lock(&current_shm->mutex);
     for (int i = 0; i < current_shm->task_count; i++) {
         if (current_shm->tasks[i].id == taskId) {
-            current_shm->tasks[i].priority = priority;
+            int old_base = current_shm->tasks[i].base_priority;
+            int old_eff = current_shm->tasks[i].effective_priority;
+
+            current_shm->tasks[i].base_priority = priority;
+            current_shm->tasks[i].effective_priority = priority;
+            current_shm->tasks[i].wait_ticks = 0;
+
             if (queue_contains(&current_shm->ready_queue, i)) {
                 queue_reorder_priority(current_shm, &current_shm->ready_queue);
             }
-            logger_log(LOG_LEVEL_INFO, "Changed priority for Task #%d to %d", taskId, priority);
-            log_queues(current_shm);
+            logger_log(LOG_LEVEL_INFO, "[PRIORITY CHANGE] Task #%d: base %d -> %d, effective %d -> %d",
+                       taskId, old_base, priority, old_eff, priority);
+            log_scheduler_snapshot(current_shm, "PRIORITY CHANGED");
             break;
         }
     }
@@ -147,3 +152,4 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_getTa
     pthread_mutex_unlock(&current_shm->mutex);
     return count;
 }
+

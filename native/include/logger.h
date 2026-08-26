@@ -14,5 +14,6 @@ int logger_init(const char *shm_name, const char *component);
 void logger_close(void);
 void logger_log(LogLevel level, const char *format, ...);
 void log_queues(SharedMemorySegment *shm);
+void log_scheduler_snapshot(SharedMemorySegment *shm, const char *action_title);
 
 #endif

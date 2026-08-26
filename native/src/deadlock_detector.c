@@ -81,9 +81,9 @@ int detect_and_resolve_deadlocks(SharedMemorySegment *shm) {
                 Task *curr = &shm->tasks[cycle_nodes[k]];
                 Task *best = &shm->tasks[best_victim_idx];
 
-                if (curr->priority < best->priority) {
+                if (curr->effective_priority < best->effective_priority) {
                     best_victim_idx = cycle_nodes[k];
-                } else if (curr->priority == best->priority) {
+                } else if (curr->effective_priority == best->effective_priority) {
                     if (curr->remaining_time_ms > best->remaining_time_ms) {
                         best_victim_idx = cycle_nodes[k];
                     } else if (curr->remaining_time_ms == best->remaining_time_ms) {
@@ -118,3 +118,4 @@ int detect_and_resolve_deadlocks(SharedMemorySegment *shm) {
 
     return resolved_count;
 }
+
