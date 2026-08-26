@@ -2,6 +2,7 @@
 #include "scheduler_shm.h"
 #include "ipc_sync.h"
 #include "process_mgmt.h"
+#include "scheduler_core.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +20,8 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_initi
     current_shm = create_or_open_shm(name, 1);
     if (current_shm != NULL) {
         init_shm_content(current_shm);
+        queue_init(&current_shm->ready_queue);
+        queue_init(&current_shm->blocked_queue);
     }
 
     (*env)->ReleaseStringUTFChars(env, shmName, name);
@@ -37,7 +40,6 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_stop
   (JNIEnv *env, jobject thiz) {
     if (current_shm != NULL) {
         current_shm->shutdown_flag = 1;
-        // Wake up sleeping processes on all semaphores
         sem_post(&current_shm->worker_sem);
         sem_post(&current_shm->scheduler_sem);
         sem_post(&current_shm->scheduler_event_sem);
@@ -72,7 +74,7 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
     int idx = current_shm->task_count;
     current_shm->tasks[idx].id = id;
     current_shm->tasks[idx].priority = priority;
-    current_shm->tasks[idx].state = TASK_STATE_NEW;
+    current_shm->tasks[idx].state = (requiredResources == 0) ? TASK_STATE_READY : TASK_STATE_NEW;
     current_shm->tasks[idx].total_time_ms = totalTimeMs;
     current_shm->tasks[idx].remaining_time_ms = totalTimeMs;
     current_shm->tasks[idx].required_resources = requiredResources;
@@ -80,6 +82,19 @@ JNIEXPORT jint JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_submi
     current_shm->tasks[idx].assigned_worker_pid = -1;
 
     current_shm->task_count++;
+
+    if (requiredResources == 0) {
+        queue_push_tail(&current_shm->ready_queue, idx);
+        if (current_shm->active_algorithm == SCHEDULER_ALGORITHM_PRIORITY) {
+            queue_reorder_priority(current_shm, &current_shm->ready_queue);
+        }
+    } else {
+        queue_push_tail(&current_shm->blocked_queue, idx);
+    }
+
+    printf("[SUBMIT] Task #%d priority=%d required_resources=0x%X\n", id, priority, requiredResources);
+    print_queues(current_shm);
+
     pthread_mutex_unlock(&current_shm->mutex);
 
     sem_post(&current_shm->scheduler_event_sem);
@@ -94,6 +109,11 @@ JNIEXPORT void JNICALL Java_com_taskscheduler_nativebridge_NativeScheduler_chang
     for (int i = 0; i < current_shm->task_count; i++) {
         if (current_shm->tasks[i].id == taskId) {
             current_shm->tasks[i].priority = priority;
+            if (queue_contains(&current_shm->ready_queue, i)) {
+                queue_reorder_priority(current_shm, &current_shm->ready_queue);
+            }
+            printf("[PRIORITY CHANGE] Task #%d new_priority=%d\n", taskId, priority);
+            print_queues(current_shm);
             break;
         }
     }

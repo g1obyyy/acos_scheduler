@@ -30,17 +30,30 @@ typedef struct {
     unsigned int required_resources;
     unsigned int held_resources;
     int assigned_worker_pid;
+    long wait_ticks;
 } Task;
+
+typedef struct {
+    int task_indices[MAX_TASKS];
+    int size;
+    int head;
+    int tail;
+} TaskQueue;
 
 typedef struct {
     Task tasks[MAX_TASKS];
     int task_count;
+
+    TaskQueue ready_queue;
+    TaskQueue blocked_queue;
+
     int running_task_id;
     
     pthread_mutex_t mutex;
     sem_t worker_sem;
     sem_t scheduler_sem;
     sem_t scheduler_event_sem;
+
     int shutdown_flag;
     int active_algorithm;
     long time_quantum_ms;
